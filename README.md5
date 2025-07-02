@@ -1,0 +1,595 @@
+# Nova AI WordPress Plugin - Installation & Setup Guide
+
+## 📋 Überblick
+
+Das Nova AI WordPress Plugin ist eine erweiterte KI-Integration, die Chat, Bildgenerierung und Vision-Analyse in WordPress ermöglicht. Es verbindet sich mit einem lokalen Python-Backend, das Ollama, LLaVA und Stable Diffusion verwendet.
+
+## 🏗️ Plugin-Struktur
+
+```
+nova-ai-plugin/
+├── nova-ai-plugin.php              # Hauptdatei (Verbesserte Version)
+├── assets/
+│   ├── css/
+│   │   ├── nova-frontend.css       # Modernes Frontend-Styling
+│   │   └── nova-admin.css          # Admin-Bereich Styling
+│   └── js/
+│       ├── nova-frontend.js        # Erweiterte Frontend-Funktionalität
+│       └── nova-admin.js           # Admin-Bereich JavaScript
+├── templates/
+│   ├── chat-interface.php         # Chat-Interface Template
+│   ├── chat-button.php            # Floating Chat-Button Template
+│   ├── admin-dashboard.php        # Admin Dashboard
+│   ├── admin-settings.php         # Einstellungen-Seite
+│   └── admin-status.php           # System-Status Seite
+├── includes/
+│   ├── class-nova-ai-settings.php # Einstellungen-Klasse
+│   ├── class-nova-ai-frontend.php # Frontend-Klasse
+│   ├── class-nova-ai-ajax.php     # AJAX-Handler
+│   └── class-nova-ai-admin.php    # Admin-Klasse
+├── languages/                     # Übersetzungsdateien
+└── README.md                      # Diese Datei
+```
+
+## 🔧 Backend-Setup
+
+### 1. Python-Backend installieren
+
+```bash
+# 1. Repository klonen oder Backend-Dateien herunterladen
+mkdir nova-ai-backend
+cd nova-ai-backend
+
+# 2. Virtual Environment erstellen
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# oder
+venv\Scripts\activate     # Windows
+
+# 3. Dependencies installieren
+pip install -r requirements.txt
+```
+
+### 2. Ollama installieren und konfigurieren
+
+```bash
+# Ollama installieren (Linux/Mac)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Modelle herunterladen
+ollama pull mixtral:8x7b
+ollama pull llava:latest
+ollama pull codellama:34b
+
+# Ollama Server starten
+ollama serve
+```
+
+### 3. Stable Diffusion WebUI (Optional)
+
+```bash
+# Stable Diffusion WebUI klonen
+git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+cd stable-diffusion-webui
+
+# WebUI starten
+./webui.sh --api --listen
+```
+
+### 4. Backend starten
+
+```bash
+# Im nova-ai-backend Verzeichnis
+python backend.py
+```
+
+Das Backend läuft standardmäßig auf `http://localhost:8000`
+
+## 🚀 WordPress Plugin-Installation
+
+### 1. Plugin-Dateien hochladen
+
+```bash
+# Methode 1: Direkt in WordPress
+# - Lade die Plugin-Dateien in /wp-content/plugins/nova-ai-plugin/
+
+# Methode 2: Via WP-CLI
+wp plugin install --activate /path/to/nova-ai-plugin.zip
+
+# Methode 3: Manuell via FTP
+# - Lade den Ordner 'nova-ai-plugin' in /wp-content/plugins/
+```
+
+### 2. Plugin aktivieren
+
+1. WordPress Admin → Plugins
+2. "Nova AI Integration Pro" aktivieren
+3. Menü "Nova AI" sollte in der Seitenleiste erscheinen
+
+### 3. Grundkonfiguration
+
+1. **Navigiere zu Nova AI → Einstellungen**
+2. **Backend-Verbindung konfigurieren:**
+   - Backend URL: `http://localhost:8000` (oder deine Server-IP)
+   - Timeout: `120` Sekunden
+
+3. **Modelle konfigurieren:**
+   - Chat-Modell: `mixtral:8x7b`
+   - Vision-Modell: `llava:latest`
+   - Bildgenerierung: Steps `20-50`, Größe `512x512`
+
+4. **Features aktivieren:**
+   - ✅ Text-Chat aktivieren
+   - ✅ Bildanalyse aktivieren
+   - ✅ Bildgenerierung aktivieren
+
+5. **Verbindung testen:**
+   - Klicke auf "Verbindung testen"
+   - Alle Tests sollten erfolgreich sein
+
+## 📱 Frontend-Integration
+
+### Shortcode-Verwendung
+
+#### 1. Vollständiges Chat-Interface
+
+```php
+[nova_ai_chat]
+```
+
+**Mit Parametern:**
+```php
+[nova_ai_chat height="600px" title="Mein AI Assistant" theme="dark" show_modes="chat,image,vision"]
+```
+
+**Verfügbare Parameter:**
+- `height`: Höhe des Containers (Standard: 600px)
+- `title`: Titel im Header (Standard: "Nova AI Assistant")
+- `theme`: Farbschema - "dark" oder "light" (Standard: dark)
+- `show_modes`: Verfügbare Modi - "all", "chat", "image", "vision" oder Kombination
+- `enable_history`: Chat-Verlauf speichern - true/false (Standard: true)
+
+#### 2. Floating Chat-Button
+
+```php
+[nova_ai_chat_button]
+```
+
+**Mit Parametern:**
+```php
+[nova_ai_chat_button text="Hilfe benötigt?" position="bottom-right" color="primary"]
+```
+
+**Verfügbare Parameter:**
+- `text`: Button-Text (Standard: "AI Chat öffnen")
+- `position`: Position - "bottom-right", "bottom-left", "top-right", "top-left"
+- `color`: Farbe - "primary", "success", "warning", "danger"
+
+### PHP-Integration für Themes
+
+```php
+<?php
+// In deinem Theme
+if (function_exists('nova_ai_chat_interface')) {
+    echo nova_ai_chat_interface(array(
+        'height' => '500px',
+        'theme' => 'light',
+        'show_modes' => 'chat,image'
+    ));
+}
+?>
+```
+
+## 🎨 Styling-Anpassungen
+
+### CSS-Variablen anpassen
+
+```css
+:root {
+    /* Farben anpassen */
+    --nova-primary: #your-brand-color;
+    --nova-secondary: #your-secondary-color;
+    
+    /* Dunkles Theme */
+    --nova-bg-primary: #your-dark-bg;
+    --nova-text-primary: #your-text-color;
+}
+
+/* Helles Theme */
+[data-theme="light"] {
+    --nova-bg-primary: #ffffff;
+    --nova-text-primary: #1e293b;
+}
+```
+
+### Container-Anpassungen
+
+```css
+.nova-ai-chat-container {
+    /* Eigene Styles */
+    border-radius: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .nova-ai-chat-container {
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+```
+
+## ⚙️ Erweiterte Konfiguration
+
+### 1. Docker-Setup (Empfohlen für Produktion)
+
+```dockerfile
+# Dockerfile für Backend
+FROM python:3.9-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+
+CMD ["python", "backend.py"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  nova-ai-backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - STABLE_DIFFUSION_URL=http://stable-diffusion:7860
+    
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    
+  stable-diffusion:
+    image: your-sd-image
+    ports:
+      - "7860:7860"
+
+volumes:
+  ollama_data:
+```
+
+### 2. WordPress-Konstanten
+
+```php
+// In wp-config.php
+define('NOVA_AI_DEBUG', true);                    // Debug-Modus
+define('NOVA_AI_BACKEND_URL', 'http://your-server:8000'); // Custom Backend URL
+define('NOVA_AI_MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB Upload-Limit
+define('NOVA_AI_CACHE_TIMEOUT', 3600);             // Cache-Zeit in Sekunden
+```
+
+### 3. Performance-Optimierung
+
+```php
+// Caching aktivieren
+add_filter('nova_ai_enable_cache', '__return_true');
+
+// Rate Limiting anpassen
+add_filter('nova_ai_rate_limit', function() {
+    return array(
+        'requests_per_minute' => 30,
+        'requests_per_hour' => 500
+    );
+});
+
+// Timeout anpassen
+add_filter('nova_ai_request_timeout', function() {
+    return 180; // 3 Minuten für lange Bildgenerierungen
+});
+```
+
+## 🔒 Sicherheit & Berechtigungen
+
+### 1. Benutzer-Capabilities
+
+```php
+// Capabilities für verschiedene Rollen
+add_action('init', function() {
+    // Nur Administratoren
+    if (current_user_can('manage_options')) {
+        // Vollzugriff
+    }
+    
+    // Editoren
+    if (current_user_can('edit_pages')) {
+        // Chat + Vision
+    }
+    
+    // Autoren
+    if (current_user_can('edit_posts')) {
+        // Nur Chat
+    }
+});
+```
+
+### 2. Content Security Policy
+
+```php
+// CSP Header hinzufügen
+add_action('wp_head', function() {
+    echo '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; connect-src \'self\' http://localhost:8000; img-src \'self\' data: blob:; style-src \'self\' \'unsafe-inline\';">';
+});
+```
+
+### 3. API-Schlüssel (Optional)
+
+```php
+// Backend mit API-Schlüssel absichern
+add_filter('nova_ai_request_headers', function($headers) {
+    $headers['Authorization'] = 'Bearer ' . get_option('nova_ai_api_key');
+    return $headers;
+});
+```
+
+## 🛠️ Debugging & Troubleshooting
+
+### 1. Debug-Modus aktivieren
+
+```php
+// In wp-config.php
+define('NOVA_AI_DEBUG', true);
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+```
+
+### 2. Log-Dateien prüfen
+
+```bash
+# WordPress Debug Log
+tail -f /wp-content/debug.log
+
+# Backend Logs
+tail -f nova-ai-backend.log
+
+# System Logs
+journalctl -f -u ollama
+```
+
+### 3. Häufige Probleme
+
+#### Backend nicht erreichbar
+```bash
+# Backend-Status prüfen
+curl http://localhost:8000
+
+# Firewall-Regeln prüfen
+sudo ufw status
+sudo iptables -L
+
+# Prozesse prüfen
+ps aux | grep python
+ps aux | grep ollama
+```
+
+#### Upload-Probleme
+```bash
+# Berechtigungen prüfen
+ls -la wp-content/uploads/nova-ai-temp/
+
+# Berechtigungen setzen
+chmod 755 wp-content/uploads/nova-ai-temp/
+chown www-data:www-data wp-content/uploads/nova-ai-temp/
+```
+
+#### Speicher-Probleme
+```php
+// Memory Limit erhöhen
+ini_set('memory_limit', '512M');
+
+// Execution Time erhöhen
+ini_set('max_execution_time', 300);
+```
+
+### 4. System-Status prüfen
+
+Nutze die integrierte Status-Seite:
+1. WordPress Admin → Nova AI → Status
+2. Klicke "Alle Systeme testen"
+3. Prüfe alle roten Fehlermeldungen
+
+## 📊 Monitoring & Analytics
+
+### 1. Verwendungsstatistiken
+
+```php
+// Hook für Tracking
+add_action('nova_ai_message_sent', function($user_id, $type, $content) {
+    // Analytics Code hier
+});
+
+// Dashboard-Widget
+add_action('wp_dashboard_setup', function() {
+    wp_add_dashboard_widget('nova_ai_stats', 'Nova AI Statistiken', 'nova_ai_dashboard_widget');
+});
+```
+
+### 2. Performance-Monitoring
+
+```php
+// Response-Zeit loggen
+add_filter('nova_ai_log_response_time', '__return_true');
+
+// Slow Query Detection
+add_action('nova_ai_slow_request', function($duration, $endpoint) {
+    error_log("Slow Nova AI request: {$endpoint} took {$duration}ms");
+});
+```
+
+## 🔄 Updates & Wartung
+
+### 1. Plugin-Updates
+
+```bash
+# Manuell via Git
+cd wp-content/plugins/nova-ai-plugin/
+git pull origin main
+
+# Backup vor Update
+wp db export nova-ai-backup.sql
+cp -r wp-content/uploads/nova-ai-temp/ nova-ai-temp-backup/
+```
+
+### 2. Backend-Updates
+
+```bash
+# Backend Dependencies aktualisieren
+pip install -r requirements.txt --upgrade
+
+# Ollama Modelle aktualisieren
+ollama pull mixtral:8x7b
+ollama pull llava:latest
+```
+
+### 3. Automatische Wartung
+
+```php
+// Cron Job für Cleanup
+add_action('nova_ai_daily_cleanup', function() {
+    // Alte Dateien löschen
+    // Logs rotieren
+    // Statistiken komprimieren
+});
+
+if (!wp_next_scheduled('nova_ai_daily_cleanup')) {
+    wp_schedule_event(time(), 'daily', 'nova_ai_daily_cleanup');
+}
+```
+
+## 🚀 Produktions-Deployment
+
+### 1. Server-Anforderungen
+
+**Minimum:**
+- PHP 7.4+
+- WordPress 5.0+
+- 4GB RAM
+- 20GB Festplatte
+
+**Empfohlen:**
+- PHP 8.1+
+- WordPress 6.0+
+- 16GB RAM
+- 100GB SSD
+- NVIDIA GPU (für Bildgenerierung)
+
+### 2. Load Balancing
+
+```nginx
+# Nginx Load Balancer
+upstream nova_ai_backend {
+    server 127.0.0.1:8000;
+    server 127.0.0.1:8001;
+    server 127.0.0.1:8002;
+}
+
+location /api/nova-ai/ {
+    proxy_pass http://nova_ai_backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+### 3. SSL/HTTPS
+
+```bash
+# Let's Encrypt SSL
+certbot --nginx -d your-domain.com
+
+# Oder manuell in wp-config.php
+define('FORCE_SSL_ADMIN', true);
+```
+
+## 📞 Support & Community
+
+### Dokumentation
+- **Plugin-Dokumentation:** `/wp-admin/admin.php?page=nova-ai`
+- **API-Dokumentation:** `http://localhost:8000/docs`
+- **Shortcode-Referenz:** Siehe Einstellungen-Seite
+
+### Debugging-Hilfe
+1. Aktiviere Debug-Modus
+2. Exportiere System-Status
+3. Überprüfe Log-Dateien
+4. Teste alle Endpoints einzeln
+
+### Community
+- **GitHub Issues:** Für Bug-Reports
+- **WordPress Forum:** Für allgemeine Fragen
+- **Discord/Slack:** Für Real-time Support
+
+## 📈 Erweiterte Features
+
+### 1. Multi-Language Support
+
+```php
+// Übersetzungen laden
+load_plugin_textdomain('nova-ai', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
+// Custom Prompts pro Sprache
+add_filter('nova_ai_system_prompt', function($prompt, $locale) {
+    if ($locale === 'de_DE') {
+        return 'Du bist ein hilfreicher deutscher AI-Assistant...';
+    }
+    return $prompt;
+}, 10, 2);
+```
+
+### 2. Custom Models
+
+```php
+// Eigene Modelle hinzufügen
+add_filter('nova_ai_available_models', function($models) {
+    $models['custom:my-model'] = 'Mein Custom Model';
+    return $models;
+});
+```
+
+### 3. Webhook Integration
+
+```php
+// Webhooks für externe Services
+add_action('nova_ai_conversation_complete', function($conversation_id, $messages) {
+    wp_remote_post('https://your-webhook-url.com', array(
+        'body' => json_encode(array(
+            'conversation_id' => $conversation_id,
+            'messages' => $messages
+        ))
+    ));
+});
+```
+
+---
+
+## ✅ Schnell-Checkliste
+
+- [ ] Python-Backend läuft auf Port 8000
+- [ ] Ollama-Service ist aktiv
+- [ ] WordPress Plugin aktiviert
+- [ ] Backend-URL konfiguriert
+- [ ] Verbindungstest erfolgreich
+- [ ] Alle Features aktiviert
+- [ ] Shortcode getestet
+- [ ] Upload-Berechtigungen korrekt
+- [ ] SSL/HTTPS konfiguriert (Produktion)
+- [ ] Backup-Strategie implementiert
+
+**Das Nova AI Plugin ist jetzt einsatzbereit! 🎉**

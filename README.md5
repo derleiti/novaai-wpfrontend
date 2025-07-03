@@ -1,0 +1,424 @@
+# Nova AI Integration
+
+Ein leistungsstarkes WordPress Plugin für KI-Integration mit Ollama, LLaVA und Stable Diffusion.
+
+## 🚀 Features
+
+- **Chat AI**: Intelligente Gespräche mit verschiedenen LLM-Modellen über Ollama
+- **Bildgenerierung**: Erstelle Bilder mit Stable Diffusion WebUI
+- **Bildanalyse**: Analysiere Bilder mit LLaVA Vision-Modellen
+- **Shortcode Support**: Einfache Integration mit `[nova_ai_chat]`
+- **Responsive Design**: Modernes, dunkles UI-Design
+- **Context-Management**: Behält Chat-Kontext bei
+- **Debug-Modus**: Ausführliche Protokollierung für Entwicklung
+
+## 📋 Voraussetzungen
+
+### Server-Umgebung
+- **WordPress** 5.0+ (PHP 7.4+)
+- **Python** 3.8+
+- **Docker** (empfohlen für Ollama)
+- Mindestens **8GB RAM** (für LLM-Modelle)
+
+### Externe Services
+- **Ollama** (für Chat und Vision)
+- **Stable Diffusion WebUI** (für Bildgenerierung)
+
+## 🛠️ Installation
+
+### 1. WordPress Plugin Installation
+
+#### Option A: ZIP-Installation
+1. **Plugin-Dateien vorbereiten:**
+   ```bash
+   # Erstelle Plugin-Verzeichnis
+   mkdir nova-ai-integration
+   
+   # Kopiere alle Dateien in das Verzeichnis:
+   # - novai-wpfrontend.php
+   # - assets/nova-admin.css
+   # - assets/nova-frontend.css  
+   # - assets/nova-frontend.js
+   
+   # Erstelle ZIP-Datei
+   zip -r nova-ai-integration.zip nova-ai-integration/
+   ```
+
+2. **Plugin hochladen:**
+   - WordPress Admin → Plugins → Plugin hochladen
+   - ZIP-Datei auswählen und installieren
+   - Plugin aktivieren
+
+#### Option B: Manuelle Installation
+1. Kopiere das Plugin-Verzeichnis nach `/wp-content/plugins/nova-ai-integration/`
+2. Gehe zu WordPress Admin → Plugins
+3. Aktiviere "Nova AI Integration"
+
+### 2. Python Backend Installation
+
+#### Systemabhängigkeiten installieren
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# CentOS/RHEL
+sudo yum install python3 python3-pip
+
+# macOS
+brew install python3
+```
+
+#### Backend einrichten
+1. **Repository klonen oder Dateien herunterladen:**
+   ```bash
+   mkdir nova-ai-backend
+   cd nova-ai-backend
+   
+   # Kopiere backend.py und requirements.txt hierher
+   ```
+
+2. **Virtual Environment erstellen:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Linux/macOS
+   # oder
+   venv\Scripts\activate     # Windows
+   ```
+
+3. **Dependencies installieren:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Backend testen:**
+   ```bash
+   python backend.py
+   ```
+   Server sollte auf `http://0.0.0.0:8000` starten.
+
+### 3. Systemd Service Setup (Empfohlen)
+
+#### Service-Datei erstellen
+```bash
+sudo nano /etc/systemd/system/nova-ai-backend.service
+```
+
+#### Service-Konfiguration:
+```ini
+[Unit]
+Description=Nova AI Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/nova-ai-backend
+Environment=PATH=/opt/nova-ai-backend/venv/bin
+ExecStart=/opt/nova-ai-backend/venv/bin/python backend.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nova-ai-backend
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/nova-ai-backend
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Service aktivieren:
+```bash
+# Service-Dateien neu laden
+sudo systemctl daemon-reload
+
+# Service aktivieren (automatischer Start)
+sudo systemctl enable nova-ai-backend
+
+# Service starten
+sudo systemctl start nova-ai-backend
+
+# Status prüfen
+sudo systemctl status nova-ai-backend
+
+# Logs anzeigen
+sudo journalctl -u nova-ai-backend -f
+```
+
+## ⚙️ Services konfigurieren
+
+### Ollama installieren und einrichten
+
+#### Ollama Installation:
+```bash
+# Linux
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# macOS
+brew install ollama
+
+# Oder mit Docker
+docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+```
+
+#### Modelle herunterladen:
+```bash
+# Chat-Modell (empfohlen)
+ollama pull mixtral:8x7b
+
+# Vision-Modell
+ollama pull llava:latest
+
+# Alternative kleinere Modelle
+ollama pull llama2:7b
+ollama pull codellama:7b
+```
+
+#### Ollama als Service:
+```bash
+# Mit systemd (meist automatisch)
+sudo systemctl enable ollama
+sudo systemctl start ollama
+
+# Oder manuell
+ollama serve
+```
+
+### Stable Diffusion WebUI
+
+#### Installation:
+```bash
+# Repository klonen
+git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git
+cd stable-diffusion-webui
+
+# Mit API starten
+./webui.sh --api --listen
+```
+
+#### Docker Alternative:
+```bash
+docker run -d \
+  --name sdwebui \
+  --gpus all \
+  -p 7860:7860 \
+  -v sd-models:/app/models \
+  -v sd-outputs:/app/outputs \
+  -e CLI_ARGS="--api --listen --allow-code --medvram --xformers --enable-insecure-extension-access" \
+  automaticai/automatic1111:latest
+```
+
+## 🔧 Plugin-Konfiguration
+
+### 1. Backend-Verbindung konfigurieren
+1. WordPress Admin → Nova AI → Einstellungen
+2. **Backend Port:** `8000` (Standard)
+3. **Debug Modus:** Aktivieren für Entwicklung
+4. **Verbindung testen** klicken
+
+### 2. Modell-Einstellungen
+- **Chat Modell:** `mixtral:8x7b` (oder verfügbares Modell)
+- **Vision Modell:** `llava:latest`
+- **SD Steps:** `20` (1-150, mehr = bessere Qualität)
+- **Bildgröße:** `512x512` (je nach GPU-Kapazität)
+
+### 3. WordPress Integration
+Shortcode in Seiten/Beiträge einfügen:
+```php
+[nova_ai_chat]
+
+// Mit Optionen
+[nova_ai_chat height="800px" title="Mein AI Assistant"]
+```
+
+## 📱 Verwendung
+
+### Chat-Modus
+- Normales Gespräch mit dem AI-Modell
+- Context wird automatisch beibehalten
+- Markdown-Unterstützung für Antworten
+
+### Bildgenerierung
+- Modus "Bild erstellen" wählen
+- Beschreibung eingeben (z.B. "Ein Sonnenuntergang am Meer")
+- Warten auf Generierung (30-60 Sekunden)
+
+### Bildanalyse
+- Modus "Bild analysieren" wählen
+- Bild hochladen (max. 10MB)
+- Frage stellen oder automatische Analyse
+
+### Keyboard Shortcuts
+- **Enter:** Nachricht senden
+- **Shift+Enter:** Neue Zeile
+- **Ctrl+K:** Chat löschen
+
+## 🔍 Fehlerbehebung
+
+### Backend-Verbindungsprobleme
+
+#### 1. Service-Status prüfen:
+```bash
+# Backend Service
+sudo systemctl status nova-ai-backend
+
+# Ollama Service
+sudo systemctl status ollama
+
+# Stable Diffusion (falls als Service)
+sudo systemctl status stable-diffusion
+```
+
+#### 2. Port-Verfügbarkeit testen:
+```bash
+# Backend
+curl http://172.17.0.1:8000/
+
+# Ollama
+curl http://localhost:11434/api/tags
+
+# Stable Diffusion
+curl http://localhost:7860/sdapi/v1/sd-models
+```
+
+#### 3. Logs überprüfen:
+```bash
+# Backend Logs
+sudo journalctl -u nova-ai-backend -n 50
+
+# WordPress Debug (wp-config.php):
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+```
+
+### Häufige Probleme
+
+#### "Backend nicht erreichbar"
+1. Backend Service läuft nicht → `sudo systemctl start nova-ai-backend`
+2. Falsche IP/Port → Einstellungen prüfen
+3. Firewall blockiert → Port 8000 freigeben
+
+#### "Ollama Service nicht erreichbar"
+1. Ollama nicht installiert → Installation wiederholen
+2. Service nicht gestartet → `ollama serve`
+3. Modell nicht verfügbar → `ollama list`
+
+#### "Stable Diffusion API Fehler"
+1. WebUI nicht mit `--api` gestartet
+2. Port 7860 blockiert
+3. GPU-Speicher voll → Neustart
+
+#### Performance-Optimierung
+1. **Für Chat:**
+   - Kleinere Modelle verwenden (llama2:7b)
+   - Context-Länge begrenzen
+   
+2. **Für Bildgenerierung:**
+   - Niedrigere Auflösung (256x256)
+   - Weniger Steps (10-15)
+   - GPU mit genug VRAM
+
+## 📁 Dateistruktur
+
+```
+nova-ai-integration/
+├── novai-wpfrontend.php          # Haupt-Plugin-Datei
+├── assets/
+│   ├── nova-admin.css            # Admin-Styling
+│   ├── nova-frontend.css         # Frontend-Styling
+│   └── nova-frontend.js          # Frontend-JavaScript
+├── backend.py                    # Python Backend
+├── requirements.txt              # Python Dependencies
+└── README.md                     # Diese Datei
+```
+
+## 🔒 Sicherheit
+
+### Produktionsumgebung
+1. **CORS konfigurieren:** Spezifische Origins in `backend.py`
+2. **SSL verwenden:** HTTPS für WordPress
+3. **User Permissions:** Nur authorisierte Benutzer
+4. **Rate Limiting:** API-Requests begrenzen
+5. **Monitoring:** Service-Überwachung einrichten
+
+### Systemd Service Security
+```ini
+# Zusätzliche Security-Optionen
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+```
+
+## 📊 Monitoring
+
+### Service-Überwachung
+```bash
+# Service-Status automatisch prüfen
+watch -n 30 'systemctl is-active nova-ai-backend ollama'
+
+# Performance-Monitoring
+htop
+nvidia-smi  # Für GPU-Überwachung
+```
+
+### WordPress-Integration
+- Admin Dashboard zeigt Service-Status
+- Debug-Logs in WordPress (wp-content/debug.log)
+- Error-Handling im Frontend
+
+## 🆘 Support
+
+### Logs sammeln für Support:
+```bash
+# System-Logs
+sudo journalctl -u nova-ai-backend -n 100 > backend.log
+sudo journalctl -u ollama -n 100 > ollama.log
+
+# WordPress-Logs
+cat wp-content/debug.log | tail -100 > wordpress.log
+
+# System-Info
+uname -a > system_info.txt
+free -h >> system_info.txt
+nvidia-smi >> system_info.txt  # Falls GPU
+```
+
+### Nützliche Befehle:
+```bash
+# Services neustarten
+sudo systemctl restart nova-ai-backend ollama
+
+# Backend manuell testen
+cd /opt/nova-ai-backend
+source venv/bin/activate
+python backend.py
+
+# Plugin deaktivieren/aktivieren
+wp plugin deactivate nova-ai-integration
+wp plugin activate nova-ai-integration
+```
+
+## 📜 Lizenz
+
+GPL v2 or later - Kompatibel mit WordPress Lizenzierung.
+
+## 🤝 Beitragen
+
+1. Fork das Repository
+2. Feature-Branch erstellen
+3. Änderungen committen
+4. Pull Request erstellen
+
+---
+
+**Hinweis:** Dieses Plugin erfordert ausreichende Systemressourcen für AI-Modelle. Teste zuerst in einer Entwicklungsumgebung.

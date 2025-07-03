@@ -49,7 +49,7 @@
     font-weight: 500;
 }
 
-.mode-btn:hover {
+.mode-btn:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.1);
     color: white;
 }
@@ -58,6 +58,11 @@
     background: rgba(255, 255, 255, 0.25);
     color: white;
     font-weight: 600;
+}
+
+.mode-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Messages Area */
@@ -180,6 +185,19 @@
     border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+/* Warning Messages */
+.nova-warning-message {
+    justify-content: center;
+}
+
+.nova-warning-message .message-content {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
 /* Code Blocks */
 .nova-message pre {
     background: #0a0a0a;
@@ -241,6 +259,11 @@
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
+.nova-ai-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .nova-ai-send {
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: white;
@@ -256,13 +279,20 @@
     flex-shrink: 0;
 }
 
-.nova-ai-send:hover {
+.nova-ai-send:hover:not(:disabled) {
     transform: scale(1.05);
     box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
 }
 
-.nova-ai-send:active {
+.nova-ai-send:active:not(:disabled) {
     transform: scale(0.95);
+}
+
+.nova-ai-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Vision Mode */
@@ -373,6 +403,7 @@
     border-radius: 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     border: 1px solid #2a2a2a;
+    z-index: 10;
 }
 
 .nova-ai-typing span {
@@ -465,4 +496,22 @@
         height: 32px !important;
         font-size: 16px !important;
     }
+    
+    .nova-ai-typing {
+        bottom: 70px;
+        left: 16px;
+    }
+}
+
+/* Smooth transitions for better UX */
+.nova-ai-chat-container * {
+    box-sizing: border-box;
+}
+
+.nova-message {
+    transition: opacity 0.3s ease;
+}
+
+.nova-message.fade-out {
+    opacity: 0;
 }

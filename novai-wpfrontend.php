@@ -3,7 +3,7 @@
  * Plugin Name: Nova AI Integration
  * Plugin URI: https://example.com/
  * Description: Intelligente KI-Integration mit Ollama, LLaVA und Stable Diffusion
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Nova AI
  * License: GPL v2 or later
  */
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin-Konstanten
-define('NOVA_AI_VERSION', '1.0.0');
+define('NOVA_AI_VERSION', '1.0.1');
 define('NOVA_AI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('NOVA_AI_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('NOVA_AI_UPLOAD_DIR', wp_upload_dir()['basedir'] . '/nova-ai-temp/');
@@ -48,6 +48,10 @@ class Nova_AI_Integration {
         add_action('wp_ajax_nova_ai_process', array($this, 'handle_ai_request'));
         add_action('wp_ajax_nopriv_nova_ai_process', array($this, 'handle_ai_request'));
         
+        // Debug AJAX Handler
+        add_action('wp_ajax_nova_ai_test_connection', array($this, 'test_backend_connection'));
+        add_action('wp_ajax_nopriv_nova_ai_test_connection', array($this, 'test_backend_connection'));
+        
         // Shortcode
         add_shortcode('nova_ai_chat', array($this, 'render_chat_interface'));
         
@@ -60,6 +64,39 @@ class Nova_AI_Integration {
         if (!wp_next_scheduled('nova_ai_cleanup_temp_files')) {
             wp_schedule_event(time(), 'hourly', 'nova_ai_cleanup_temp_files');
         }
+    }
+    
+    /**
+     * Test Backend Connection
+     */
+    public function test_backend_connection() {
+        $api_url = $this->get_api_url();
+        
+        $response = wp_remote_get($api_url . '/', array(
+            'timeout' => 10,
+            'sslverify' => false,
+            'headers' => array(
+                'Accept' => 'application/json',
+                'User-Agent' => 'WordPress/Nova-AI'
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Backend nicht erreichbar: ' . $response->get_error_message(),
+                'api_url' => $api_url
+            ));
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        wp_send_json_success(array(
+            'message' => 'Backend erreichbar',
+            'status_code' => $status_code,
+            'response' => json_decode($body, true),
+            'api_url' => $api_url
+        ));
     }
     
     /**
@@ -110,6 +147,7 @@ class Nova_AI_Integration {
         register_setting('nova_ai_settings', 'nova_ai_vision_model');
         register_setting('nova_ai_settings', 'nova_ai_sd_steps');
         register_setting('nova_ai_settings', 'nova_ai_sd_size');
+        register_setting('nova_ai_settings', 'nova_ai_debug');
     }
     
     /**
@@ -122,6 +160,7 @@ class Nova_AI_Integration {
             update_option('nova_ai_vision_model', sanitize_text_field($_POST['nova_ai_vision_model']));
             update_option('nova_ai_sd_steps', intval($_POST['nova_ai_sd_steps']));
             update_option('nova_ai_sd_size', sanitize_text_field($_POST['nova_ai_sd_size']));
+            update_option('nova_ai_debug', isset($_POST['nova_ai_debug']));
             
             echo '<div class="notice notice-success"><p>Einstellungen gespeichert!</p></div>';
         }
@@ -131,9 +170,17 @@ class Nova_AI_Integration {
         $vision_model = get_option('nova_ai_vision_model', 'llava:latest');
         $sd_steps = get_option('nova_ai_sd_steps', 20);
         $sd_size = get_option('nova_ai_sd_size', '512x512');
+        $debug = get_option('nova_ai_debug', false);
         ?>
-        <div class="wrap">
+        <div class="wrap nova-ai-settings">
             <h1>Nova AI Einstellungen</h1>
+            
+            <!-- Connection Test -->
+            <div id="api-status-check">
+                <h2>Backend-Verbindung testen</h2>
+                <button type="button" id="test-connection" class="button">Verbindung testen</button>
+                <div id="api-status-result"></div>
+            </div>
             
             <form method="post" action="">
                 <?php settings_fields('nova_ai_settings'); ?>
@@ -148,6 +195,15 @@ class Nova_AI_Integration {
                                    class="small-text" />
                             <p class="description">Standard Port: 8000</p>
                             <p class="description">API URL wird sein: <code>http://172.17.0.1:<?php echo esc_html($port); ?></code></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Debug Modus</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="nova_ai_debug" <?php checked($debug); ?> />
+                                Ausführliche Fehlerprotokollierung aktivieren
+                            </label>
                         </td>
                     </tr>
                 </table>
@@ -197,12 +253,96 @@ class Nova_AI_Integration {
                 <?php submit_button(); ?>
             </form>
             
+            <!-- Test Area -->
+            <div class="nova-ai-test-area">
+                <h2>Test-Bereich</h2>
+                <div class="card">
+                    <h3>Chat Test</h3>
+                    <textarea id="test-prompt" placeholder="Test-Nachricht eingeben..." rows="3"></textarea>
+                    <button type="button" id="test-chat" class="button">Chat testen</button>
+                    <div id="test-result"></div>
+                </div>
+            </div>
+            
             <h2>Verwendung</h2>
             <div class="card">
                 <p>Verwende den folgenden Shortcode um das AI-Chat Interface einzubinden:</p>
                 <code>[nova_ai_chat]</code>
             </div>
         </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Connection Test
+            $('#test-connection').on('click', function() {
+                const $btn = $(this);
+                const $result = $('#api-status-result');
+                
+                $btn.prop('disabled', true).text('Teste...');
+                $result.html('<p>Teste Verbindung...</p>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'nova_ai_test_connection'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $result.html('<div class="notice notice-success inline"><p><strong>✅ Verbindung erfolgreich!</strong><br>Status: ' + response.data.status_code + '<br>URL: ' + response.data.api_url + '</p></div>');
+                        } else {
+                            $result.html('<div class="notice notice-error inline"><p><strong>❌ Verbindung fehlgeschlagen</strong><br>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        $result.html('<div class="notice notice-error inline"><p><strong>❌ Unerwarteter Fehler</strong></p></div>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('Verbindung testen');
+                    }
+                });
+            });
+            
+            // Chat Test
+            $('#test-chat').on('click', function() {
+                const prompt = $('#test-prompt').val().trim();
+                if (!prompt) {
+                    alert('Bitte eine Test-Nachricht eingeben');
+                    return;
+                }
+                
+                const $btn = $(this);
+                const $result = $('#test-result');
+                
+                $btn.prop('disabled', true).text('Teste...');
+                $result.html('<p>Sende Nachricht...</p>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'nova_ai_process',
+                        type: 'chat',
+                        prompt: prompt,
+                        context: '[]'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $result.html('<div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin-top: 10px;"><strong>Antwort:</strong><br>' + response.data.content + '</div>');
+                        } else {
+                            $result.html('<div style="background: #ffe6e6; padding: 15px; border-radius: 5px; margin-top: 10px; color: #d00;"><strong>Fehler:</strong><br>' + response.data + '</div>');
+                        }
+                    },
+                    error: function() {
+                        $result.html('<div style="background: #ffe6e6; padding: 15px; border-radius: 5px; margin-top: 10px; color: #d00;">Unerwarteter Fehler beim Test</div>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('Chat testen');
+                    }
+                });
+            });
+        });
+        </script>
         <?php
     }
     
@@ -214,6 +354,15 @@ class Nova_AI_Integration {
         <div class="wrap">
             <h1>Nova AI Dashboard</h1>
             <p>Willkommen bei Nova AI! Nutze den Shortcode <code>[nova_ai_chat]</code> um die KI einzubinden.</p>
+            
+            <div class="card">
+                <h3>Quick Start</h3>
+                <ol>
+                    <li>Gehe zu <a href="<?php echo admin_url('admin.php?page=nova-ai-settings'); ?>">Einstellungen</a></li>
+                    <li>Teste die Backend-Verbindung</li>
+                    <li>Füge <code>[nova_ai_chat]</code> zu einer Seite oder einem Beitrag hinzu</li>
+                </ol>
+            </div>
         </div>
         <?php
     }
@@ -222,10 +371,24 @@ class Nova_AI_Integration {
      * AJAX Handler für alle AI Requests
      */
     public function handle_ai_request() {
-        check_ajax_referer('nova_ai_nonce', 'nonce');
+        // Prüfe Nonce nur wenn vorhanden
+        if (isset($_POST['nonce'])) {
+            check_ajax_referer('nova_ai_nonce', 'nonce');
+        }
         
-        $type = sanitize_text_field($_POST['type']);
+        $type = sanitize_text_field($_POST['type'] ?? '');
+        
+        if (empty($type)) {
+            wp_send_json_error('Request-Typ fehlt');
+            return;
+        }
+        
         $api_url = $this->get_api_url();
+        
+        // Logging für Debug
+        if (get_option('nova_ai_debug', false)) {
+            error_log("Nova AI Request: Type=$type, API_URL=$api_url");
+        }
         
         switch ($type) {
             case 'chat':
@@ -241,26 +404,33 @@ class Nova_AI_Integration {
                 break;
                 
             default:
-                wp_send_json_error('Unbekannter Request-Typ');
+                wp_send_json_error('Unbekannter Request-Typ: ' . $type);
         }
     }
     
     /**
-     * Chat Request Handler
+     * Chat Request Handler - Verbessert
      */
     private function handle_chat_request($api_url) {
-        $prompt = sanitize_text_field($_POST['prompt']);
+        $prompt = sanitize_text_field($_POST['prompt'] ?? '');
         $context = isset($_POST['context']) ? json_decode(stripslashes($_POST['context']), true) : array();
+        
+        if (empty($prompt)) {
+            wp_send_json_error('Prompt ist leer');
+            return;
+        }
         
         $messages = array();
         
         // Context hinzufügen
         if (is_array($context)) {
             foreach ($context as $msg) {
-                $messages[] = array(
-                    'role' => $msg['role'],
-                    'content' => $msg['content']
-                );
+                if (isset($msg['role']) && isset($msg['content'])) {
+                    $messages[] = array(
+                        'role' => sanitize_text_field($msg['role']),
+                        'content' => sanitize_textarea_field($msg['content'])
+                    );
+                }
             }
         }
         
@@ -270,60 +440,112 @@ class Nova_AI_Integration {
             'content' => $prompt
         );
         
+        $request_data = array(
+            'messages' => $messages,
+            'model' => get_option('nova_ai_chat_model', 'mixtral:8x7b'),
+            'stream' => false
+        );
+        
+        // Debug Logging
+        if (get_option('nova_ai_debug', false)) {
+            error_log("Nova AI Chat Request Data: " . json_encode($request_data));
+        }
+        
         $response = wp_remote_post($api_url . '/chat', array(
-            'headers' => array('Content-Type' => 'application/json'),
-            'body' => json_encode(array(
-                'messages' => $messages,
-                'model' => get_option('nova_ai_chat_model', 'mixtral:8x7b')
-            )),
-            'timeout' => 120,  // Erhöht von 60
-            'connect_timeout' => 30,  // Expliziter Connect Timeout
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'User-Agent' => 'WordPress/Nova-AI'
+            ),
+            'body' => json_encode($request_data),
+            'timeout' => 180,  // 3 Minuten
+            'connect_timeout' => 30,
             'sslverify' => false,
-            'httpversion' => '1.0',  // HTTP 1.0 statt 1.1
+            'httpversion' => '1.1',
             'blocking' => true,
-            'compress' => false
+            'compress' => false,
+            'redirection' => 0  // Keine Redirects folgen
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+            $error_msg = $response->get_error_message();
+            if (get_option('nova_ai_debug', false)) {
+                error_log("Nova AI Chat Error: " . $error_msg);
+            }
+            wp_send_json_error('Verbindungsfehler: ' . $error_msg);
             return;
         }
         
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
         
-        if (isset($body['message']['content'])) {
+        if ($status_code !== 200) {
+            if (get_option('nova_ai_debug', false)) {
+                error_log("Nova AI Chat HTTP Error: Status=$status_code, Body=$body");
+            }
+            wp_send_json_error('Backend-Fehler: HTTP ' . $status_code);
+            return;
+        }
+        
+        $parsed_body = json_decode($body, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            if (get_option('nova_ai_debug', false)) {
+                error_log("Nova AI Chat JSON Error: " . json_last_error_msg() . ", Raw Body: $body");
+            }
+            wp_send_json_error('Ungültige API-Antwort (JSON Fehler)');
+            return;
+        }
+        
+        if (isset($parsed_body['message']['content'])) {
             wp_send_json_success(array(
-                'content' => $body['message']['content'],
+                'content' => $parsed_body['message']['content'],
                 'role' => 'assistant'
             ));
         } else {
-            wp_send_json_error('Ungültige API-Antwort');
+            if (get_option('nova_ai_debug', false)) {
+                error_log("Nova AI Chat Response Error: " . json_encode($parsed_body));
+            }
+            wp_send_json_error('Unerwartete API-Antwort-Struktur');
         }
     }
     
     /**
-     * Image Generation Handler
+     * Image Generation Handler - Verbessert
      */
     private function handle_image_generation($api_url) {
-        $prompt = sanitize_text_field($_POST['prompt']);
+        $prompt = sanitize_text_field($_POST['prompt'] ?? '');
+        
+        if (empty($prompt)) {
+            wp_send_json_error('Prompt ist leer');
+            return;
+        }
+        
         $size = get_option('nova_ai_sd_size', '512x512');
         list($width, $height) = explode('x', $size);
         
+        $request_data = array(
+            'prompt' => $prompt,
+            'negative_prompt' => 'ugly, blurry, low quality, distorted',
+            'steps' => intval(get_option('nova_ai_sd_steps', 20)),
+            'width' => intval($width),
+            'height' => intval($height),
+            'cfg_scale' => 7.0,
+            'seed' => -1
+        );
+        
         $response = wp_remote_post($api_url . '/image/generate', array(
-            'headers' => array('Content-Type' => 'application/json'),
-            'body' => json_encode(array(
-                'prompt' => $prompt,
-                'negative_prompt' => 'ugly, blurry, low quality, distorted',
-                'steps' => intval(get_option('nova_ai_sd_steps', 20)),
-                'width' => intval($width),
-                'height' => intval($height)
-            )),
-            'timeout' => 120,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ),
+            'body' => json_encode($request_data),
+            'timeout' => 180,
             'sslverify' => false
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+            wp_send_json_error('Bildgenerierung fehlgeschlagen: ' . $response->get_error_message());
             return;
         }
         
@@ -335,30 +557,38 @@ class Nova_AI_Integration {
                 'seed' => isset($body['info']['seed']) ? $body['info']['seed'] : null
             ));
         } else {
-            wp_send_json_error('Bildgenerierung fehlgeschlagen');
+            wp_send_json_error('Bildgenerierung fehlgeschlagen: Ungültige Antwort');
         }
     }
     
     /**
-     * Vision Request Handler
+     * Vision Request Handler - Verbessert
      */
     private function handle_vision_request($api_url) {
-        $prompt = sanitize_text_field($_POST['prompt']);
-        $image_data = $_POST['image'];
+        $prompt = sanitize_text_field($_POST['prompt'] ?? 'Was siehst du auf diesem Bild?');
+        $image_data = $_POST['image'] ?? '';
+        
+        if (empty($image_data)) {
+            wp_send_json_error('Bild-Daten fehlen');
+            return;
+        }
         
         $response = wp_remote_post($api_url . '/vision', array(
-            'headers' => array('Content-Type' => 'application/json'),
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ),
             'body' => json_encode(array(
                 'prompt' => $prompt,
                 'image' => $image_data,
                 'model' => get_option('nova_ai_vision_model', 'llava:latest')
             )),
-            'timeout' => 60,
+            'timeout' => 120,
             'sslverify' => false
         ));
         
         if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+            wp_send_json_error('Vision-Analyse fehlgeschlagen: ' . $response->get_error_message());
             return;
         }
         
@@ -370,7 +600,7 @@ class Nova_AI_Integration {
                 'role' => 'assistant'
             ));
         } else {
-            wp_send_json_error('Vision-Analyse fehlgeschlagen');
+            wp_send_json_error('Vision-Analyse fehlgeschlagen: Ungültige Antwort');
         }
     }
     
@@ -515,6 +745,7 @@ register_activation_hook(__FILE__, function() {
     add_option('nova_ai_vision_model', 'llava:latest');
     add_option('nova_ai_sd_steps', 20);
     add_option('nova_ai_sd_size', '512x512');
+    add_option('nova_ai_debug', false);
 });
 
 // Deaktivierung
@@ -522,3 +753,4 @@ register_deactivation_hook(__FILE__, function() {
     // Cleanup scheduled events
     wp_clear_scheduled_hook('nova_ai_cleanup_temp_files');
 });
+?>

@@ -236,8 +236,8 @@ class Nova_AI_Integration {
                 $this->handle_image_generation($api_url);
                 break;
                 
-            case 'vision':
-                $this->handle_vision_request($api_url . '/vision/upload');
+            case 'vision_upload':
+                $this->handle_vision_request($api_url);
                 break;
                 
             default:
@@ -250,71 +250,59 @@ class Nova_AI_Integration {
      */
     private function handle_chat_request($api_url) {
         $prompt = sanitize_text_field($_POST['prompt']);
-        error_log("Prompt: $prompt");
-        $context = isset($_POST['context']) ? json_decode(stripslashes($_POST['context']), true) : array();
+        $session_id = sanitize_text_field($_POST['session_id']);
         
-        $messages = array();
-        
-        // Context hinzufügen
-        if (is_array($context)) {
-            foreach ($context as $msg) {
-                $messages[] = array(
-                    'role' => $msg['role'],
-                    'content' => $msg['content']
-                );
-            }
-        }
-        
-        // Aktuelle Nachricht
-        $messages[] = array(
-            'role' => 'user',
-            'content' => $prompt
+        // Backend erwartet NUR prompt, session_id und model - KEIN context!
+        $request_body = array(
+            'prompt' => $prompt,
+            'session_id' => $session_id,
+            'model' => get_option('nova_ai_chat_model', 'mixtral:8x7b')
         );
         
-        $body = json_encode(array(
-            'prompt' => $prompt,
-            'session_id' => sanitize_text_field($_POST['session_id'])
-        // Debug
-        , 'debug_session_id' => $_POST['session_id'],
-            'model' => get_option('nova_ai_chat_model', 'mixtral:8x7b')
-        ));
-
-        $body = json_encode(array(
-            'prompt' => $prompt,
-            'session_id' => sanitize_text_field($_POST['session_id']),
-            'model' => get_option('nova_ai_chat_model', 'mixtral:8x7b')
-        ));
-
-        error_log("NovaAI Plugin → POST to /chat: " . $body);
-
+        error_log("NovaAI Chat Request to " . $api_url . "/chat: " . json_encode($request_body));
+        
         $response = wp_remote_post($api_url . '/chat', array(
             'method'    => 'POST',
             'headers'   => array('Content-Type' => 'application/json'),
-            'body'      => $body,
-            'timeout'   => 30
+            'body'      => json_encode($request_body),
+            'timeout'   => 180,  // Erhöht auf 3 Minuten
+            'sslverify' => false
         ));
-
-        if (is_wp_error($response)) {
-            error_log("NovaAI Plugin → WP Error: " . $response->get_error_message());
-        } else {
-            error_log("NovaAI Plugin → Backend Response: " . wp_remote_retrieve_body($response));
-        }
-
         
         if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+            error_log("NovaAI Chat WP Error: " . $response->get_error_message());
+            wp_send_json_error('Verbindungsfehler: ' . $response->get_error_message());
             return;
         }
         
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $http_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
         
+        error_log("NovaAI Chat Response Code: " . $http_code);
+        error_log("NovaAI Chat Response Body: " . $response_body);
+        
+        if ($http_code !== 200) {
+            wp_send_json_error('API Fehler (HTTP ' . $http_code . '): ' . $response_body);
+            return;
+        }
+        
+        $body = json_decode($response_body, true);
+        
+        // Backend gibt direkt das Ollama-Result zurück
         if (isset($body['message']['content'])) {
             wp_send_json_success(array(
                 'content' => $body['message']['content'],
                 'role' => 'assistant'
             ));
+        } else if (isset($body['response'])) {
+            // Fallback für andere Response-Formate
+            wp_send_json_success(array(
+                'content' => $body['response'],
+                'role' => 'assistant'
+            ));
         } else {
-            wp_send_json_error('Ungültige API-Antwort');
+            error_log("NovaAI Chat - Unerwartete API-Antwort: " . json_encode($body));
+            wp_send_json_error('Ungültige API-Antwort - keine message.content gefunden');
         }
     }
     
@@ -323,24 +311,31 @@ class Nova_AI_Integration {
      */
     private function handle_image_generation($api_url) {
         $prompt = sanitize_text_field($_POST['prompt']);
-        error_log("Prompt: $prompt");
         $size = get_option('nova_ai_sd_size', '512x512');
         list($width, $height) = explode('x', $size);
         
+        $request_body = array(
+            'prompt' => $prompt,
+            'negative_prompt' => 'ugly, blurry, low quality, distorted',
+            'steps' => intval(get_option('nova_ai_sd_steps', 20)),
+            'width' => intval($width),
+            'height' => intval($height),
+            'cfg_scale' => 7.0,
+            'seed' => -1,
+            'sampler_name' => 'Euler a'
+        );
+        
+        error_log("NovaAI Image Request: " . json_encode($request_body));
+        
         $response = wp_remote_post($api_url . '/image/generate', array(
             'headers' => array('Content-Type' => 'application/json'),
-            'body' => json_encode(array(
-                'prompt' => $prompt,
-                'negative_prompt' => 'ugly, blurry, low quality, distorted',
-                'steps' => intval(get_option('nova_ai_sd_steps', 20)),
-                'width' => intval($width),
-                'height' => intval($height)
-            )),
-            'timeout' => 120,
+            'body' => json_encode($request_body),
+            'timeout' => 180,
             'sslverify' => false
         ));
         
         if (is_wp_error($response)) {
+            error_log("NovaAI Image Error: " . $response->get_error_message());
             wp_send_json_error($response->get_error_message());
             return;
         }
@@ -348,9 +343,10 @@ class Nova_AI_Integration {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         
         if (isset($body['images'][0])) {
+            $info = isset($body['info']) ? json_decode($body['info'], true) : array();
             wp_send_json_success(array(
                 'image' => 'data:image/png;base64,' . $body['images'][0],
-                'seed' => isset($body['info']['seed']) ? $body['info']['seed'] : null
+                'seed' => isset($info['seed']) ? $info['seed'] : null
             ));
         } else {
             wp_send_json_error('Bildgenerierung fehlgeschlagen');
@@ -362,26 +358,51 @@ class Nova_AI_Integration {
      */
     private function handle_vision_request($api_url) {
         $prompt = sanitize_text_field($_POST['prompt']);
-        error_log("Prompt: $prompt");
         $image_data = $_POST['image'];
         
-        $response = wp_remote_post($api_url . '/vision', array(
-            'headers' => array('Content-Type' => 'application/json'),
-            'body' => json_encode(array(
-                'prompt' => $prompt,
-                'image' => $image_data,
-                'model' => get_option('nova_ai_vision_model', 'llava:latest')
-            )),
-            'timeout' => 60,
-            'sslverify' => false
-        ));
+        // Temporäre Datei erstellen für multipart/form-data
+        $temp_file = tempnam(sys_get_temp_dir(), 'nova_vision_');
+        file_put_contents($temp_file, base64_decode($image_data));
         
-        if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+        // cURL verwenden für multipart/form-data
+        $ch = curl_init();
+        $cfile = new CURLFile($temp_file, 'image/jpeg', 'image.jpg');
+        
+        $post_data = array(
+            'prompt' => $prompt,
+            'model' => get_option('nova_ai_vision_model', 'llava:latest'),
+            'file' => $cfile
+        );
+        
+        curl_setopt($ch, CURLOPT_URL, $api_url . '/vision/upload');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+        
+        // Temp-Datei löschen
+        unlink($temp_file);
+        
+        if ($curl_error) {
+            error_log("NovaAI Vision cURL Error: " . $curl_error);
+            wp_send_json_error('Vision Upload fehlgeschlagen: ' . $curl_error);
             return;
         }
         
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if ($http_code !== 200) {
+            error_log("NovaAI Vision HTTP Error: " . $http_code . " - " . $response);
+            wp_send_json_error('Vision API Fehler (HTTP ' . $http_code . ')');
+            return;
+        }
+        
+        $body = json_decode($response, true);
+        error_log("NovaAI Vision Response: " . json_encode($body));
         
         if (isset($body['response'])) {
             wp_send_json_success(array(

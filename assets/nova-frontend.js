@@ -1,10 +1,52 @@
 jQuery(document).ready(function($) {
+    // === Session Management mit 1-Stunden-Timeout ===
+    function getOrCreateSessionId() {
+        const sessionData = localStorage.getItem('nova_ai_session_data');
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000; // 1 Stunde in Millisekunden
+        
+        if (sessionData) {
+            const data = JSON.parse(sessionData);
+            // Prüfe ob Session noch gültig ist (unter 1 Stunde alt)
+            if (data.timestamp && (now - data.timestamp) < oneHour) {
+                return data.sessionId;
+            }
+        }
+        
+        // Neue Session erstellen
+        const newSessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+        
+        // Session mit Timestamp speichern
+        localStorage.setItem('nova_ai_session_data', JSON.stringify({
+            sessionId: newSessionId,
+            timestamp: now
+        }));
+        
+        // Info-Nachricht bei Session-Wechsel
+        if (sessionData) {
+            addMessage('🔄 Neue Session gestartet (vorherige Session abgelaufen)', 'system');
+        }
+        
+        return newSessionId;
+    }
+    
+    // Session-ID abrufen/erstellen
+    let sessionId = getOrCreateSessionId();
+    
+    // Session-Timer - prüft alle 5 Minuten ob Session noch gültig ist
+    setInterval(function() {
+        const oldSessionId = sessionId;
+        sessionId = getOrCreateSessionId();
+        
+        if (oldSessionId !== sessionId) {
+            addMessage('⏰ Session abgelaufen - neue Session wurde erstellt', 'system');
+        }
+    }, 5 * 60 * 1000); // Alle 5 Minuten prüfen
 
-// === Session-ID generieren ===
-let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
-
-    // Chat-Kontext speichern
-    let chatContext = [];
     let currentMode = 'chat';
     
     // Mode Switching
@@ -50,6 +92,9 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
         const prompt = $('#nova-prompt').val().trim();
         if (!prompt) return;
         
+        // Session-Gültigkeit prüfen
+        sessionId = getOrCreateSessionId();
+        
         // Nachricht zum Chat hinzufügen
         addMessage(prompt, 'user');
         
@@ -79,8 +124,11 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
         return imageKeywords.some(keyword => lowerPrompt.includes(keyword));
     }
     
-    // Chat Message
+    // Chat Message - KEINE CONTEXT ÜBERTRAGUNG MEHR!
     function sendChatMessage(prompt) {
+        // Session-Gültigkeit prüfen
+        sessionId = getOrCreateSessionId();
+        
         $.ajax({
             url: nova_ai.ajax_url,
             type: 'POST',
@@ -88,7 +136,7 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                 action: 'nova_ai_process',
                 type: 'chat',
                 prompt: prompt,
-                context: JSON.stringify(chatContext),
+                session_id: sessionId,  // Nur prompt und session_id senden!
                 nonce: nova_ai.nonce
             },
             success: function(response) {
@@ -96,21 +144,17 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                 if (response.success) {
                     addMessage(response.data.content, 'assistant');
                     
-                    // Context aktualisieren
-                    chatContext.push({role: 'user', content: prompt});
-                    chatContext.push({role: 'assistant', content: response.data.content});
-                    
-                    // Limitiere Context auf letzte 10 Nachrichten
-                    if (chatContext.length > 10) {
-                        chatContext = chatContext.slice(-10);
-                    }
+                    // Context wird vom Backend verwaltet, nicht mehr hier
+                    console.log('Chat Response erhalten:', response.data.content);
                 } else {
                     addMessage('Entschuldigung, es gab einen Fehler: ' + response.data, 'error');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 hideTyping();
-                addMessage('Verbindungsfehler. Bitte versuche es später erneut.', 'error');
+                console.error('Chat Error:', status, error);
+                console.error('Response:', xhr.responseText);
+                addMessage('Verbindungsfehler: ' + error, 'error');
             }
         });
     }
@@ -129,6 +173,7 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                 prompt: prompt,
                 nonce: nova_ai.nonce
             },
+            timeout: 120000, // 2 Minuten Timeout
             success: function(response) {
                 hideTyping();
                 statusMsg.remove();
@@ -149,9 +194,10 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                     addMessage('Bildgenerierung fehlgeschlagen: ' + response.data, 'error');
                 }
             },
-            error: function() {
+            error: function(xhr) {
                 hideTyping();
                 statusMsg.remove();
+                console.error('Image Error:', xhr);
                 addMessage('Timeout - Die Bildgenerierung dauert zu lange.', 'error');
             }
         });
@@ -197,6 +243,7 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                     image: base64,
                     nonce: nova_ai.nonce
                 },
+                timeout: 60000, // 1 Minute Timeout
                 success: function(response) {
                     hideTyping();
                     if (response.success) {
@@ -205,8 +252,9 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
                         addMessage('Bildanalyse fehlgeschlagen: ' + response.data, 'error');
                     }
                 },
-                error: function() {
+                error: function(xhr) {
                     hideTyping();
+                    console.error('Vision Error:', xhr);
                     addMessage('Fehler bei der Bildanalyse.', 'error');
                 }
             });
@@ -216,6 +264,7 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
         // Reset inputs
         $('#nova-vision-file').val('');
         $('#nova-vision-prompt').val('');
+        $('.file-label').text('📷 Bild auswählen');
     }
     
     // Helper Functions
@@ -226,17 +275,21 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
         let messageHtml = '';
         
         if (type === 'user') {
+            // Prüfe ob content HTML enthält (für Vision Preview)
+            const isHtml = /<[a-z][\s\S]*>/i.test(content);
+            const displayContent = isHtml ? content : escapeHtml(content).replace(/\n/g, '<br>');
+            
             messageHtml = `
                 <div class="nova-message nova-user-message" id="${messageId}">
                     <div class="message-content">
-                        <div class="message-text">${escapeHtml(content).replace(/\n/g, '<br>')}</div>
+                        <div class="message-text">${displayContent}</div>
                         <div class="message-time">${timestamp}</div>
                     </div>
                     <div class="message-avatar">👤</div>
                 </div>
             `;
         } else if (type === 'assistant') {
-            const processedContent = content.includes('<img') ? content : renderMarkdownLite(content);
+            const processedContent = content.includes('<img') || content.includes('<div') ? content : renderMarkdownLite(content);
             messageHtml = `
                 <div class="nova-message nova-ai-message" id="${messageId}">
                     <div class="message-avatar">🤖</div>
@@ -280,7 +333,7 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
             '"': '&quot;',
             "'": '&#039;'
         };
-        return text.replace(/[&<>"']/g, m => map[m]);
+        return String(text).replace(/[&<>"']/g, m => map[m]);
     }
     
     function renderMarkdownLite(text) {
@@ -321,66 +374,37 @@ let sessionId = '44728beb-431e-404f-a21b-97ad6cad3e53';
         const file = this.files[0];
         if (file && file.type.startsWith('image/')) {
             const $label = $(this).siblings('.file-label');
-            $label.text(file.name);
+            $label.text('📷 ' + file.name);
         }
     });
     
     // Context Commands
     $(document).on('keydown', '#nova-prompt', function(e) {
-        // Strg+K zum Löschen des Kontexts
+        // Strg+K zum Löschen des Kontexts (löscht nur Frontend-Anzeige)
         if (e.ctrlKey && e.key === 'k') {
             e.preventDefault();
             if (confirm('Chat-Verlauf löschen?')) {
-                chatContext = [];
                 $('#nova-messages').empty();
                 addMessage('💬 Neuer Chat gestartet', 'system');
             }
         }
     });
     
+    // Session Info anzeigen (optional)
+    function showSessionInfo() {
+        const sessionData = JSON.parse(localStorage.getItem('nova_ai_session_data'));
+        if (sessionData && sessionData.timestamp) {
+            const elapsed = Date.now() - sessionData.timestamp;
+            const remaining = Math.max(0, 60 - Math.floor(elapsed / 60000));
+            return `Session läuft noch ${remaining} Minuten`;
+        }
+        return 'Neue Session';
+    }
+    
     // Initialize
     addMessage('👋 Hallo! Ich bin Nova AI. Wie kann ich dir helfen?', 'assistant');
+    
+    // Optional: Session-Status in der Konsole
+    console.log('Nova AI Session:', sessionId);
+    console.log('Session Status:', showSessionInfo());
 });
-
-
-
-    $('#vision-upload-btn').on('click', function() {
-        const prompt = $('#vision-prompt').val() || " ";
-        const fileInput = $('#vision-file')[0];
-        if (!fileInput || !fileInput.files.length) {
-            alert('Bitte ein Bild auswählen.');
-            return;
-        }
-
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('prompt', prompt);
-        formData.append('model', 'llava:latest');
-        formData.append('session_id', sessionId);
-        formData.append('file', file, 'image.jpg');
-
-        $('#vision-status').text('⏳ Bild wird analysiert...');
-        $.ajax({
-            url: ajaxurl,
-            method: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            enctype: 'multipart/form-data',
-            dataType: 'json',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            success: function(response) {
-                if (response.success) {
-                    $('#vision-response').html('<pre>' + response.data.response + '</pre>');
-                } else {
-                    $('#vision-response').html('<b>❌ Fehler:</b> ' + (response.data || 'Unbekannter Fehler'));
-                }
-            },
-            error: function(xhr) {
-                $('#vision-response').html('<b>❌ Fehler beim Senden:</b> ' + xhr.statusText);
-            },
-            complete: function() {
-                $('#vision-status').text('');
-            }
-        });
-    });

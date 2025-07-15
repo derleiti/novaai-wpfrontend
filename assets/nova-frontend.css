@@ -1,0 +1,468 @@
+/* Nova AI Chat Container */
+.nova-ai-chat-container {
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0a;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Header */
+.nova-ai-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    backdrop-filter: blur(10px);
+}
+
+.nova-ai-header h3 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* Mode Selector */
+.nova-ai-mode-selector {
+    display: flex;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.mode-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.mode-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.mode-btn.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    font-weight: 600;
+}
+
+/* Messages Area */
+.nova-ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    background: #0f0f0f;
+    background-image: 
+        radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(255, 119, 198, 0.1) 0%, transparent 50%);
+}
+
+/* Message Styles */
+.nova-message {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: messageSlide 0.3s ease-out;
+}
+
+@keyframes messageSlide {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+}
+
+/* User Messages */
+.nova-user-message {
+    flex-direction: row-reverse;
+}
+
+.nova-user-message .message-content {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border-radius: 20px 20px 4px 20px;
+    padding: 12px 18px;
+    max-width: 70%;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.nova-user-message .message-avatar {
+    width: 36px;
+    height: 36px;
+    background: #1f2937;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+/* AI Messages */
+.nova-ai-message .message-avatar {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.nova-ai-message .message-content {
+    background: #1a1a1a;
+    color: #e5e5e5;
+    border-radius: 20px 20px 20px 4px;
+    padding: 12px 18px;
+    max-width: 70%;
+    border: 1px solid #2a2a2a;
+}
+
+/* Message Text and Time */
+.message-text {
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.message-time {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 4px;
+}
+
+.nova-ai-message .message-time {
+    color: #666;
+}
+
+/* System Messages */
+.nova-system-message {
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.nova-system-message .message-content {
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+}
+
+/* Error Messages */
+.nova-error-message {
+    justify-content: center;
+}
+
+.nova-error-message .message-content {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Code Blocks */
+.nova-message pre {
+    background: #0a0a0a;
+    color: #e5e5e5;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid #2a2a2a;
+}
+
+.nova-message code {
+    background: rgba(139, 92, 246, 0.1);
+    color: #a78bfa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.9em;
+}
+
+.nova-message pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+}
+
+/* Input Area */
+.nova-ai-input-area {
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    padding: 16px;
+}
+
+.input-mode {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.nova-ai-input {
+    flex: 1;
+    background: #0f0f0f;
+    border: 1px solid #2a2a2a;
+    color: #e5e5e5;
+    padding: 12px 18px;
+    border-radius: 24px;
+    font-size: 15px;
+    resize: none;
+    min-height: 44px;
+    max-height: 120px;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.nova-ai-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.nova-ai-send {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.nova-ai-send:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+}
+
+.nova-ai-send:active {
+    transform: scale(0.95);
+}
+
+/* Vision Mode */
+#mode-vision {
+    flex-wrap: wrap;
+}
+
+.file-upload-wrapper {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.file-input {
+    display: none;
+}
+
+.file-label {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #1f2937;
+    color: #e5e5e5;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    border: 1px solid #2a2a2a;
+}
+
+.file-label:hover {
+    background: #2a2a3e;
+    border-color: #6366f1;
+}
+
+/* Generated Images */
+.nova-generated-image {
+    text-align: center;
+    margin: 12px 0;
+}
+
+.nova-generated-image img {
+    max-width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    margin: 12px 0;
+}
+
+.image-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+}
+
+.download-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.seed-info {
+    font-size: 13px;
+    color: #666;
+}
+
+/* Vision Preview */
+.nova-vision-preview {
+    text-align: center;
+    margin: 8px 0;
+}
+
+.nova-vision-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.nova-vision-preview p {
+    margin: 0;
+    font-style: italic;
+    color: #888;
+    font-size: 14px;
+}
+
+/* Typing Indicator */
+.nova-ai-typing {
+    position: absolute;
+    bottom: 80px;
+    left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #1a1a1a;
+    padding: 12px 18px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid #2a2a2a;
+}
+
+.nova-ai-typing span {
+    width: 8px;
+    height: 8px;
+    background: #8b5cf6;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+
+.nova-ai-typing span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.nova-ai-typing span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+/* Scrollbar Styling */
+.nova-ai-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.nova-ai-messages::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.nova-ai-messages::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 4px;
+}
+
+.nova-ai-messages::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+}
+
+/* Links */
+.nova-message a {
+    color: #8b5cf6;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.nova-message a:hover {
+    border-bottom-color: #8b5cf6;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .nova-ai-header {
+        padding: 16px;
+    }
+    
+    .nova-ai-header h3 {
+        font-size: 18px;
+    }
+    
+    .nova-ai-mode-selector {
+        flex-wrap: wrap;
+    }
+    
+    .mode-btn {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    
+    .nova-user-message .message-content,
+    .nova-ai-message .message-content {
+        max-width: 85%;
+    }
+    
+    .nova-ai-messages {
+        padding: 16px;
+    }
+    
+    .message-avatar {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 16px !important;
+    }
+}
